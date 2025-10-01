@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Queens Genetic Algorithm</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .board { border-collapse: collapse; margin: 20px auto; }
+        .board td { width: 40px; height: 40px; text-align: center; border: 1px solid black; }
+        .white { background-color: #f0f0f0; }
+        .black { background-color: #c0c0c0; }
+        .controls { margin: 20px; }
+        .stats { margin: 20px; }
+    </style>
+</head>
+<body>
+    <h1>N-Queens Genetic Algorithm</h1>
+    <div class="board-container">
+        <table class="board">
+            {% for row in range(N) %}
+            <tr>
+                {% for col in range(N) %}
+                <td class="{{ 'white' if (row + col) % 2 == 0 else 'black' }}">
+                    {% if board[col] == row %}
+                    ♛
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    <div class="stats">
+        <p id="generation">Generation: {{ generation }}</p>
+        <p id="best_fitness">Best Fitness: {{ best_fitness }}</p>
+        <p id="avg_fitness">Average Fitness: {{ avg_fitness }}</p>
+        <p id="conflicts">Conflicts: {{ conflicts }}</p>
+        <p id="running">Running: {{ 'Yes' if running else 'No' }}</p>
+    </div>
+    <div class="controls">
+        <form action="/update_params" method="post">
+            <label>N: <input type="number" name="N" value="{{ N }}" min="4"></label>
+            <label>μ: <input type="number" name="mu" value="{{ mu }}" min="2"></label>
+            <label>λ: <input type="number" name="lam" value="{{ lam }}" min="1"></label>
+            <label>Mutation: <input type="number" step="0.01" name="mutation" value="{{ mutation }}"></label>
+            <label>Tournament k: <input type="number" name="tournament_k" value="{{ tournament_k }}" min="2"></label>
+            <label>Mode: 
+                <select name="replacement_mode">
+                    <option value="mu_plus_lambda" {{ 'selected' if replacement_mode == 'mu_plus_lambda' }}>μ+λ</option>
+                    <option value="mu_comma_lambda" {{ 'selected' if replacement_mode == 'mu_comma_lambda' }}>μ,λ</option>
+                </select>
+            </label>
+            <button type="submit">Update Params</button>
+        </form>
+        <br>
+        <button onclick="step()">Step</button>
+        <button onclick="toggleRun()">Toggle Run</button>
+        <a href="/reset"><button>Reset</button></a>
+    </div>
+    <script data-running="{{ 'true' if running else 'false' }}"></script>
+    <script>
+        var scriptElement = document.querySelector('script[data-running]');
+        var running = scriptElement.getAttribute('data-running') === 'true';
+        var intervalId;
+
+        function updateBoard(board) {
+            var table = document.querySelector('.board');
+            var N = {{ N }};
+            for (var row = 0; row < N; row++) {
+                for (var col = 0; col < N; col++) {
+                    var cell = table.rows[row].cells[col];
+                    cell.innerHTML = (board[col] == row) ? '♛' : '';
+                }
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('generation').innerHTML = 'Generation: ' + data.generation;
+            document.getElementById('best_fitness').innerHTML = 'Best Fitness: ' + data.best_fitness;
+            document.getElementById('avg_fitness').innerHTML = 'Average Fitness: ' + data.avg_fitness;
+            document.getElementById('conflicts').innerHTML = 'Conflicts: ' + data.conflicts;
+        }
+
+        function step() {
+            fetch('/step')
+            .then(response => response.json())
+            .then(data => {
+                updateBoard(data.board);
+                updateStats(data);
+            });
+        }
+
+        if (running) {
+            intervalId = setInterval(step, 500);
+        }
+
+        // For toggle, since it redirects, the page will reload with new running
+    </script>
+</body>
+</html>

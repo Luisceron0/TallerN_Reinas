@@ -1,18 +1,80 @@
-"""
-Aplicación interactiva con interfaz gráfica para el Algoritmo Genético de N-Reinas.
-"""
-
-import os
-import time
-import threading
-import csv
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from matplotlib.widgets import Button, Slider, TextBox
-
+from flask import Flask, render_template, request, redirect, url_for
 from genetic_algorithm import GeneticPermutation
 from utils import conflicts_count, max_pairs
+import numpy as np
+
+app = Flask(__name__)
+
+# Global state
+ga = None
+running = False
+history_best = []
+history_avg = []
+
+def init_ga(N=8, mu=50, lam=50, mutation=0.15, tournament_k=3, replacement_mode='mu_plus_lambda'):
+    global ga, history_best, history_avg
+    ga = GeneticPermutation(N=N, mu=mu, lam=lam, mutation_prob=mutation, tournament_k=tournament_k, replacement_mode=replacement_mode, seed=42)
+    history_best = []
+    history_avg = []
+
+init_ga()
+
+@app.route('/')
+def index():
+    if ga is None:
+        init_ga()
+    best_idx = int(np.argmax(ga.aptitudes))
+    board = ga.population[best_idx]
+    best_fitness = max(ga.aptitudes)
+    avg_fitness = float(np.mean(ga.aptitudes))
+    conflicts = conflicts_count(board)
+    return render_template('index.html', N=ga.N, mu=ga.mu, lam=ga.lam, mutation=ga.mutation_prob, tournament_k=ga.tournament_k,
+                           replacement_mode=ga.replacement_mode, generation=ga.generation, best_fitness=best_fitness,
+                           avg_fitness=avg_fitness, conflicts=conflicts, board=board, running=running,
+                           history_best=history_best, history_avg=history_avg)
+
+@app.route('/update_params', methods=['POST'])
+def update_params():
+    N = int(request.form['N'])
+    mu = int(request.form['mu'])
+    lam = int(request.form['lam'])
+    mutation = float(request.form['mutation'])
+    tournament_k = int(request.form['tournament_k'])
+    replacement_mode = request.form['replacement_mode']
+    init_ga(N, mu, lam, mutation, tournament_k, replacement_mode)
+    return redirect(url_for('index'))
+
+@app.route('/step')
+def step():
+    global history_best, history_avg
+    if ga:
+        stats = ga.step()
+        history_best.append(stats['best_fitness'])
+        history_avg.append(stats['avg_fitness'])
+        best_idx = int(np.argmax(ga.aptitudes))
+        board = ga.population[best_idx]
+        best_fitness = max(ga.aptitudes)
+        avg_fitness = float(np.mean(ga.aptitudes))
+        conflicts = conflicts_count(board)
+        return {
+            'generation': ga.generation,
+            'best_fitness': best_fitness,
+            'avg_fitness': avg_fitness,
+            'conflicts': conflicts,
+            'board': list(board)
+        }
+    return {}
+
+@app.route('/reset')
+def reset():
+    init_ga(ga.N, ga.mu, ga.lam, ga.mutation_prob, ga.tournament_k, ga.replacement_mode)
+    return redirect(url_for('index'))
+
+@app.route('/toggle_run')
+def toggle_run():
+    global running
+    running = not running
+    return redirect(url_for('index'))
 
 class InteractiveGAApp:
     def __init__(self):
@@ -355,4 +417,4 @@ class InteractiveGAApp:
         self.batch_running = False
 
 if __name__ == '__main__':
-    InteractiveGAApp()
+    app.run(debug=True)
